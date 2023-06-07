@@ -20,9 +20,9 @@ conn = pymysql.connect(
 
 cur = conn.cursor()
 cur.execute("USE test1;")
-cur.execute("SELECT colOne from first;")
-output = cur.fetchall()[0][0]
-
+cur.execute("SELECT * from tasks WHERE id = 1;")
+output = cur.fetchall()[0][1]
+print(output)
 
 conn.close()
 

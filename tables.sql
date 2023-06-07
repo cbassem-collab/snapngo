@@ -1,7 +1,7 @@
-USE crowdnets_db;
+USE snapngo_db;
 
 -- create a table for the users
-CREATE TABLE 'users' (
+CREATE TABLE IF NOT EXISTS 'users' (
     'id' VARCHAR(50),
     'name' VARCHAR(50),
     'compensation' DECIMAL(4,2),
@@ -12,7 +12,7 @@ CREATE TABLE 'users' (
 ENGINE = InnoDB;
 
 -- create a table for the tasks
-CREATE TABLE 'tasks' (
+CREATE TABLE IF NOT EXISTS 'tasks' (
     'id' INT AUTO_INCREMENT,
     'location' VARCHAR(100),
     'description' VARCHAR(100),
@@ -26,7 +26,7 @@ CREATE TABLE 'tasks' (
 ENGINE = InnoDB;
 
 -- create a table for the assignments
-CREATE TABLE assignments (
+CREATE TABLE IF NOT EXISTS assignments (
     taskID INT,
     userID VARCHAR(15),
     recommendTime DATETIME, -- when recommended
