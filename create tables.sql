@@ -4,7 +4,7 @@ USE snapngo_db;
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(50),
     `name` VARCHAR(50),
-    compensation DECIMAL(4,2),
+    compensation DECIMAL(4,2) DEFAULT 0,
     reliability DECIMAL(4,2),
     PRIMARY KEY (id)
 )
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS assignments (
     recommendTime DATETIME,
     img BLOB,
     submissionTime DATETIME,
-    accepted BIT,
+    accepted ENUM('not assigned','accepted','rejected','pending'),
     PRIMARY KEY (taskID, userID),
     FOREIGN KEY (taskID) REFERENCES tasks(id)
         ON UPDATE CASCADE
