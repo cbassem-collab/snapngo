@@ -8,8 +8,8 @@ run this file in another terminal
 (both of these things need to happen in order to run)
 """
 import os
-import bot
 import testbot
+import local_testbot
 import helper_functions
 from pathlib import Path
 from dotenv import load_dotenv
@@ -35,7 +35,7 @@ info_page = "INFO"
 sample_task = "If you are trying to finish a task, please send in task#+picture formate as shown below:"
 
 def get_all_users_info():
-    return bot.get_all_users_info()
+    return local_testbot.get_all_users_info()
 
 def add_users():
     '''
@@ -87,7 +87,7 @@ def get_assignments():
     cur.execute(query)
     assignments = cur.fetchall()
     conn.close()
-    print(assignments)
+    #print(assignments)
     assignments_dict = {}
     for assignment in assignments:
         uid = assignment[1]
@@ -98,6 +98,16 @@ def get_assignments():
             assignments_dict[uid] = [assignment]       
     #print(assignmentsDict)
     return assignments_dict
+
+def get_assign_status(task, user):
+    conn = helper_functions.connectDB(db_name)
+    cur = conn.cursor()
+    query = f'''SELECT status FROM assignments
+                WHERE taskID = {task} AND userID = '{user}'
+    '''
+    cur.execute(query)
+    status = cur.fetchone()[0]
+    return status
 
 def update_assign_status(status, task_id, user_id):
     '''
@@ -123,7 +133,7 @@ def update_assign_status(status, task_id, user_id):
     conn.close
 
 def send_tasks(assign_dict):
-    testbot.send_tasks(assign_dict)
+    local_testbot.send_tasks(assign_dict)
     update_assign_status("pending", 0, 0)
 
 def get_assigned_tasks(user):
@@ -168,5 +178,6 @@ if __name__ == "__main__":
     #addUsers()
     assign_dict = get_assignments()
     send_tasks(assign_dict)
+    print(local_testbot.assignment_objs.keys())
+    print(local_testbot.assignment_objs)
     #print(get_assigned_tasks("U05B24S3LR1"))
-    
