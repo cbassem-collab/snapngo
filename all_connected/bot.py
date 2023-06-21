@@ -20,6 +20,9 @@ DB_NAME = 'snapngo_test'
 
 
 ## ### LOAD IN MESSAGE BLOCKS ### ###
+with open('block_messages/default_btn.json', 'r') as infile:
+    default_btn = json.load(infile)
+
 with open('block_messages/help_block.json', 'r') as infile:
     info_page = json.load(infile)
 
@@ -48,6 +51,7 @@ def send_tasks(assignments_dict) -> None:
     Returns nothing
     ''' 
     for user_id in assignments_dict:
+        print(f'IN SEND TASKS: {user_id}')
         if BOT_ID != user_id:   
             try:
                 for task_info in assignments_dict[user_id]:
@@ -83,86 +87,23 @@ def generate_message(task_info, user_id):
     return block
 
 def button_color(task_id, user_id):
+    """
+    Takes a task id (int) and user id (str).
+    Determines button formatting based on assignment status 
+    Returns button block.
+    """
     status = messenger.get_assign_status(task_id, user_id)
-    if status == "rejected":
-        block = {     
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Accept",
-                    },
-                    "value": "accepted",
-                    "action_id": "accepted"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Reject",
-                    },
-                    "style": "danger",
-                    "value": "rejected",
-                    "action_id": "rejected"
-                }                    
-            ],
-            "block_id": str(task_id)
-        }
-        
+    if status == "rejected": # Reject btn is red
+        block = default_btn.copy
+        block['elements'][1]['stype'] = 'danger'
         block['block_id'] = str(task_id)
-    elif status == "accepted":
-        block = {     
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Accept",
-                    },
-                    "style": "primary",
-                    "value": "accepted",
-                    "action_id": "accepted"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Reject",
-                    },
-                    "value": "rejected",
-                    "action_id": "rejected"
-                }                    
-            ],
-            "block_id": str(task_id)
-        }
-    else:
-        block = {     
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Accept",
-                    },
-                    "value": "accepted",
-                    "action_id": "accepted"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Reject",
-                    },
-                    "value": "rejected",
-                    "action_id": "rejected"
-                }                    
-            ],
-            "block_id": str(task_id)
-        }
+    elif status == "accepted": # Accept btn is green
+        block = default_btn.copy
+        block['elements'][0]['stype'] = 'primary'
+        block['block_id'] = str(task_id)
+    else: # both buttons grey
+        block = default_btn.copy
+        block['block_id'] = str(task_id)
     return block
 
 
