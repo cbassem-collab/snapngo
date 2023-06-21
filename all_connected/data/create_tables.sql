@@ -5,17 +5,18 @@ CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(50),
     `name` VARCHAR(50),
     compensation DECIMAL(4,2) DEFAULT 0,
-    reliability DECIMAL(4,2),
+    reliability DECIMAL(4,2) DEFAULT 0,
     PRIMARY KEY (id)
 )
 ENGINE = InnoDB;
 
 CREATE TABLE IF NOT EXISTS tasks (
     id INT AUTO_INCREMENT,
-    location VARCHAR(100),
+    `location` VARCHAR(100),
     `description` VARCHAR(100),
-    deadline DATETIME,
+    start_time DATETIME,
     `time_window` INT(3),
+    deadline DATETIME,
     compensation DECIMAL(4,2),
     expired BOOLEAN,
     PRIMARY KEY (id)
@@ -23,22 +24,19 @@ CREATE TABLE IF NOT EXISTS tasks (
 ENGINE = InnoDB;
 
 CREATE TABLE IF NOT EXISTS assignments (
-    id INT,
-    taskID INT,
-    userID VARCHAR(15),
-    recommendTime DATETIME,
-    img BLOB,
-    submissionTime DATETIME,
-    status ENUM('not assigned','accepted','rejected','pending'),
-    PRIMARY KEY (id),
-    FOREIGN KEY (taskID) REFERENCES tasks(id)
+    task_id INT,
+    user_id VARCHAR(15),
+    recommend_time DATETIME,
+    img VARCHAR(100),
+    submission_time DATETIME,
+    status ENUM('not assigned','accepted','rejected','pending') DEFAULT 'not assigned',
+    PRIMARY KEY (task_id, user_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
-    FOREIGN KEY (userID) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id)
         ON UPDATE CASCADE
         ON DELETE CASCADE
 )
 ENGINE = InnoDB;
-
-ALTER TABLE tasks ADD COLUMN starttime DATETIME;
     
