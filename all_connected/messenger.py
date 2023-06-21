@@ -9,7 +9,6 @@ run this file in another terminal
 """
 import os
 import testbot
-import local_testbot
 import helper_functions
 from pathlib import Path
 from dotenv import load_dotenv
@@ -35,7 +34,7 @@ info_page = "INFO"
 sample_task = "If you are trying to finish a task, please send in task#+picture formate as shown below:"
 
 def get_all_users_info():
-    return local_testbot.get_all_users_info()
+    return testbot.get_all_users_info()
 
 def add_users():
     '''
@@ -133,7 +132,7 @@ def update_assign_status(status, task_id, user_id):
     conn.close
 
 def send_tasks(assign_dict):
-    local_testbot.send_tasks(assign_dict)
+    testbot.send_tasks(assign_dict)
     update_assign_status("pending", 0, 0)
 
 def get_assigned_tasks(user):
@@ -178,6 +177,4 @@ if __name__ == "__main__":
     #addUsers()
     assign_dict = get_assignments()
     send_tasks(assign_dict)
-    print(local_testbot.assignment_objs.keys())
-    print(local_testbot.assignment_objs)
     #print(get_assigned_tasks("U05B24S3LR1"))
