@@ -69,10 +69,13 @@ def generateMessage(assignList):
     '''
     block = []
     for taskInfo in assignList:
-        text = ("Task" + str(taskInfo[0]) + " Location: " + taskInfo[2] + 
-                "\nDescription: " + taskInfo[3] + 
-                "\nStart time: " + str(taskInfo[4]) + " Window: " + str(taskInfo[5])+ 
-                "\nCompensation: " + str(taskInfo[6]))
+        print("TASK_INFO")
+        print(taskInfo)
+        print(taskInfo[2])
+        text = (f"Task {taskInfo[0]} Location: {taskInfo[2]}" +
+                "\nDescription: " + taskInfo[3])
+                # "\nStart time: " + str(taskInfo[4]) + " Window: " + str(taskInfo[5])+ 
+                # "\nCompensation: " + str(taskInfo[6]))
         block.append(
             {
                 "type": "section",
