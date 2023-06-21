@@ -31,8 +31,10 @@ flask_app = Flask(__name__)
 # and builds WSGI response from Bolt's response.
 handler = SlackRequestHandler(app)
 
-info_page = "INFO"
-sample_task = "If you are trying to finish a task, please send in task#+picture formate as shown below:"
+f = open('block_messages/help_block.json')
+info_page = json.load(f)
+f = open('block_messages/sample_task.json')
+sample_task = json.load(f)
 
 # Register routes to Flask app
 @flask_app.route("/slack/events", methods=["POST"])
