@@ -63,7 +63,7 @@ def add_users(user_store):
 def update_tasks_expired():
     conn = helper_functions.connectDB(db_name)
     cur = conn.cursor()
-    cur.execute("UPDATE tasks SET `expired` = 1 WHERE (starttime + INTERVAL time_window MINUTE) < NOW()")
+    cur.execute("UPDATE tasks SET `expired` = 1 WHERE (start_time + INTERVAL time_window MINUTE) < NOW()")
     conn.commit()
     conn.close
 
@@ -71,11 +71,11 @@ def get_task_list(user_id, task_id):
     conn = helper_functions.connectDB(db_name)
     cur = conn.cursor()
     #print("finished1")
-    query = f'''SELECT assignments.taskID, assignments.userID, 
-                tasks.location, tasks.description, tasks.starttime, tasks.time_window, 
+    query = f'''SELECT assignments.task_id, assignments.user_id, 
+                tasks.location, tasks.description, tasks.start_time, tasks.time_window, 
                 tasks.compensation
-                FROM assignments INNER JOIN tasks ON assignments.taskID = tasks.id
-                WHERE (assignments.taskID = {task_id} AND assignments.userID = '{user_id}')'''
+                FROM assignments INNER JOIN tasks ON assignments.task_id = tasks.id
+                WHERE (assignments.task_id = {task_id} AND assignments.user_id = '{user_id}')'''
     cur.execute(query)
     assignment = cur.fetchone()
     print("ASSSIGN", assignment)
@@ -94,10 +94,10 @@ def get_assignments(db_name):
     conn = helper_functions.connectDB(db_name)
     cur = conn.cursor()
     #print("finished1")
-    query = '''SELECT assignments.taskID, assignments.userID, 
-                tasks.location, tasks.description, tasks.starttime, tasks.time_window, 
+    query = '''SELECT assignments.task_id, assignments.user_id, 
+                tasks.location, tasks.description, tasks.start_time, tasks.time_window, 
                 tasks.compensation
-                FROM assignments INNER JOIN tasks ON assignments.taskID = tasks.id
+                FROM assignments INNER JOIN tasks ON assignments.task_id = tasks.id
                 WHERE (assignments.status = 'not assigned' AND tasks.expired != 1)'''
     cur.execute(query)
     assignments = cur.fetchall()
@@ -118,7 +118,7 @@ def get_assign_status(task, user):
     conn = helper_functions.connectDB(db_name)
     cur = conn.cursor()
     query = f'''SELECT status FROM assignments
-                WHERE taskID = {task} AND userID = '{user}'
+                WHERE task_id = {task} AND user_id = '{user}'
     '''
     cur.execute(query)
     status = cur.fetchone()[0]
@@ -137,13 +137,13 @@ def update_assign_status(status, task_id, user_id):
     cur = conn.cursor()
     if status == "pending":
         query = '''UPDATE assignments INNER JOIN tasks 
-                ON assignments.taskID = tasks.id
-                SET assignments.status = 'pending', recommendTime = NOW()
+                ON assignments.task_id = tasks.id
+                SET assignments.status = 'pending', recommend_time = NOW()
                 WHERE (assignments.status = 'not assigned' AND tasks.expired != 1)
         '''
         cur.execute(query)
     elif status == "accepted" or status == "rejected":
-        cur.execute(f"UPDATE assignments SET `status` = '{status}' WHERE taskID={task_id} AND userID='{user_id}'")
+        cur.execute(f"UPDATE assignments SET `status` = '{status}' WHERE task_id={task_id} AND user_id='{user_id}'")
     conn.commit()
     conn.close
 
