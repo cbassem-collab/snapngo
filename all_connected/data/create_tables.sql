@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     start_time DATETIME,
     time_window INT(3),
     compensation DECIMAL(4,2) DEFAULT 0,
-    expired BOOLEAN,
+    expired BOOLEAN DEFAULT 0,
     slot INT DEFAULT 0,
     PRIMARY KEY (id)
 )
@@ -40,13 +40,15 @@ CREATE TABLE IF NOT EXISTS assignments (
     img varchar(100),
     submission_time DATETIME,
     `status` ENUM('not assigned','accepted','rejected','pending') DEFAULT 'not assigned',
-    PRIMARY KEY (id),
+    checked BOOLEAN DEFAULT 0,
     FOREIGN KEY (task_id) REFERENCES tasks(id)
         ON UPDATE CASCADE
         ON DELETE SET NULL,
     FOREIGN KEY (user_id) REFERENCES users(id)
         ON UPDATE CASCADE
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY (task_id, user_id)
 )
 ENGINE = InnoDB;
 

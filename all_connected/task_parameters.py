@@ -14,7 +14,7 @@ num_total_users = get_num_users() #get number of total participants from the dat
                                                 #helper variable
 
 ##### TASK CYCLE PARAMETERS #####
-START_HOURS = time(0, 1) #default 9 am
+START_HOURS = time(19, 30) #default 9 am
 END_HOURS = time(23,50) #default 5:00 pm
 
 
@@ -33,7 +33,7 @@ MESSENGER_BOT_CYCLE = 60*60+2   #in seconds. cycle where the slack bot send the 
                                 #Default: 1 hour and 2 seconds.
                                     #Again, making sure all tasks are matched before we send them to users.
 
-CHECK_EXPIRE_CYCLE = 60*60      #in seconds. cycle where we check for nearly expired tasks and push them to reliable users
+CHECK_EXPIRE_CYCLE = 30*60      #in seconds. cycle where we check for nearly expired tasks and push them to reliable users
 
 EXPIRE_THRESHOLD = 30*60        #in seconds. the threshold 
 

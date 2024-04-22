@@ -11,6 +11,7 @@ import helper_functions
 from datetime import datetime
 
 import os
+import decimal
 from pathlib import Path
 from dotenv import load_dotenv
 env_path = Path('..') / '.env'
@@ -142,8 +143,9 @@ def insert_assignments(task, user):
     cur = conn.cursor()
 
     # Create & execute query
-    query = f"INSERT INTO assignments(`task_id`, `user_id`, `status`) VALUES \
-        ({task}, '{user}', 'pending');"
+    query = f'''INSERT INTO assignments(`task_id`, `user_id`, `status`) 
+                VALUES ({task}, '{user}', 'pending')
+                ON DUPLICATE KEY UPDATE `status` = 'pending';'''
     cur.execute(query)
 
     # Commit the changes to the database
@@ -159,7 +161,7 @@ def get_assign_status(task, user):
     cur.execute(query)
     status = cur.fetchone()
     print('status: ', status)
-    if status == None:
+    if status == None or status[0] == 'rejected':
         query = f'''SELECT slot FROM tasks
                     WHERE id = {task}'''
         cur.execute(query)
@@ -330,30 +332,30 @@ def update_reliability(user_id):
     cur = conn.cursor()
     query = f'''SELECT COUNT(status)
                 FROM assignments
-                WHERE status = 'accepted' and user_id = '{user_id}' and DATE(recommend_time) >= CURDATE() -1
+                WHERE status = 'accepted' and user_id = '{user_id}' and DATE(submission_time) >= CURDATE() -1
             '''
     cur.execute(query)
     accepted = cur.fetchone()[0]
     if accepted == 0:
-        new_reliability = 0.1
+        new_reliability = decimal.Decimal(0.1)
     else:
         query = f'''SELECT COUNT(img)
                     FROM assignments
-                    WHERE img IS NOT NULL and user_id = '{user_id}' and DATE(recommend_time) >= CURDATE() -1
+                    WHERE img IS NOT NULL and user_id = '{user_id}' and DATE(submission_time) >= CURDATE() -1
                 '''
         cur.execute(query)
         submissions = cur.fetchone()[0]
         if submissions == 0:
-            new_reliability = 0.1
+            new_reliability = decimal.Decimal(0.1)
         else:
-            new_reliability = round(submissions/accepted, 2)
+            new_reliability = decimal.Decimal(round(submissions/accepted, 2))
     query = f'''SELECT reliability
                 FROM users
-                WHERE user_id = '{user_id}'
+                WHERE id = '{user_id}'
             '''
     cur.execute(query)
     old_reliability = cur.fetchone()[0]
-    reliability = old_reliability * 0.3 +new_reliability * 0.7
+    reliability = old_reliability * decimal.Decimal(0.3) +new_reliability * decimal.Decimal(0.7)
     print(user_id, reliability)
     query = f'''UPDATE users 
             SET reliability = {reliability}
