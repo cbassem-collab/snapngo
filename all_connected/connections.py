@@ -78,7 +78,7 @@ def check_expired_call():
     assignments = matching_assignments.match_users_and_tasks(task_parameters.MATCHING_ALGO, users, tasks)
     print(assignments)
     for user in assignments:
-        bot.send_messages(user, text = f'Ping: {assignments[user]}')
+        bot.send_messages(user, text = f"These tasks are expiring in 30 mins: {assignments[user]}. Don't forget to check them out!")
 
 ### ### MESSENGER call ### ###
 # Sends out tasks & updates recommendTime in 'assignments' table

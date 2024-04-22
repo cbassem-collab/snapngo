@@ -14,8 +14,8 @@ num_total_users = get_num_users() #get number of total participants from the dat
                                                 #helper variable
 
 ##### TASK CYCLE PARAMETERS #####
-START_HOURS = time(19, 30) #default 9 am
-END_HOURS = time(23,50) #default 5:00 pm
+START_HOURS = time(9, 00) #default 9 am
+END_HOURS = time(17,00) #default 5:00 pm
 
 
 TASK_CYCLE = 30*60      #in seconds. cycle where new tasks are generated. 
