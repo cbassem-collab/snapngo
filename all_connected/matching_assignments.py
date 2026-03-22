@@ -11,9 +11,14 @@ from datetime import datetime
 
 import os
 helper_functions.load_env()
+from run_logging import get_logger, log_step
+
+logger = get_logger(__name__)
+logger.info("module loaded")
 
 ### ### SPECIFIC HELPER FUNCTIONS ### ###
 def read_table(db, table_name):
+    log_step(logger, "read_table enter", table_name=table_name)
     """
     * Helper function for match_users_and_tasks()*
     Takes (str) database name and (str) table name.
@@ -61,6 +66,7 @@ def create_task_user_dict(assignment_data):
 
 
 def insert_assignments(assignment_info, db):
+    log_step(logger, "insert_assignments enter", count=len(assignment_info) if assignment_info else 0)
     """
      * Helper function for match_users_and_tasks() *
     Takes a list of assignments and database (obj).
@@ -78,6 +84,61 @@ def insert_assignments(assignment_info, db):
 
         # Commit the changes to the database
         db.commit()
+    log_step(logger, "insert_assignments exit")
+
+def get_unassigned_tasks(db, task_type):
+    log_step(logger, "get_unassigned_tasks enter", task_type=task_type)
+    cursor = db.cursor()
+    cursor.execute(
+        """SELECT tasks.id
+           FROM tasks
+           LEFT JOIN assignments ON tasks.id = assignments.task_id
+           WHERE tasks.expired = 0
+             AND tasks.task_type = %s
+             AND tasks.id NOT IN (SELECT task_id FROM assignments)""",
+        (task_type,),
+    )
+    out = set([tasks[0] for tasks in cursor.fetchall()])
+    log_step(logger, "get_unassigned_tasks exit", count=len(out))
+    return out
+
+
+def get_verification_task_submitters(db, task_ids):
+    log_step(logger, "get_verification_task_submitters enter", task_ids_count=len(task_ids) if task_ids else 0)
+    if not task_ids:
+        return {}
+    cursor = db.cursor()
+    placeholders = ",".join(["%s"] * len(task_ids))
+    cursor.execute(
+        f"""SELECT tasks.id, assignments.user_id
+            FROM tasks
+            INNER JOIN assignments ON tasks.assignment_id = assignments.id
+            WHERE tasks.id IN ({placeholders})""",
+        tuple(task_ids),
+    )
+    m = {row[0]: row[1] for row in cursor.fetchall()}
+    log_step(logger, "get_verification_task_submitters exit", mapped=len(m))
+    return m
+
+
+def match_verification_tasks(task_ids, user_data, db):
+    log_step(logger, "match_verification_tasks enter", task_count=len(task_ids) if task_ids else 0)
+    import task_parameters
+    allow_self = getattr(task_parameters, "ALLOW_SELF_VERIFICATION_FOR_TESTING", False)
+    submitter_map = get_verification_task_submitters(db, task_ids)
+    matchings = []
+    for task_id in task_ids:
+        submitter = submitter_map.get(task_id)
+        if allow_self:
+            available = user_data["id"]
+        else:
+            available = [uid for uid in user_data["id"] if uid != submitter]
+        if not available:
+            available = user_data["id"]
+        user_id = random.choice(list(available))
+        matchings.append([task_id, user_id])
+    log_step(logger, "match_verification_tasks exit", matchings=len(matchings))
+    return matchings
 
 def create_ab_groups(user_list):
     middle_index = int(len(user_list)/2)
@@ -155,6 +216,7 @@ def algorithm_weighted(assignment_data, task_data, user_data):
 
 ### ### OVERALL MATCHING & ASSIGNMENT GENERATION ### ###
 def match_users_and_tasks(matching_algo, db_name):
+    log_step(logger, "match_users_and_tasks enter", db_name=db_name)
     """
     Takes 'users' table data & 'tasks' table data, and a matching algorithm (function).
     Finds unexpired & unassigned tasks, matches users to those tasks, writes those
@@ -173,23 +235,28 @@ def match_users_and_tasks(matching_algo, db_name):
     cursor = db.cursor()
     cursor.execute(f"UPDATE tasks SET expired = 1 WHERE start_time + INTERVAL time_window minute < now()")
     
-    # Identify unassigned tasks 
-    cursor.execute(f"SELECT tasks.id FROM tasks LEFT JOIN assignments ON tasks.id=assignments.task_id \
-                   WHERE expired = 0 AND tasks.id NOT IN (SELECT task_id from assignments)")
-    unassigned_tasks = set([tasks[0] for tasks in cursor.fetchall()])
-    # Use the given Matching Algorithm to match users to unassigned tasks
-    if user_data:
-        task_user_matchings = matching_algo(assignment_data, unassigned_tasks, user_data)
+    data_tasks = get_unassigned_tasks(db, "data_collection")
+    verification_tasks = get_unassigned_tasks(db, "verification")
+    log_step(logger, "match_users_and_tasks unassigned", data_collection=len(data_tasks), verification=len(verification_tasks))
 
-        # Generate Assignments & insert them into the Assignments table
-        all_assignments = [{'task_id': task_id, 'user_id': user_id} for task_id, user_id in task_user_matchings]
-        insert_assignments(all_assignments, db)
+    if user_data:
+        if data_tasks:
+            task_user_matchings = matching_algo(assignment_data, data_tasks, user_data)
+            all_assignments = [{'task_id': task_id, 'user_id': user_id} for task_id, user_id in task_user_matchings]
+            insert_assignments(all_assignments, db)
+
+        if verification_tasks:
+            verification_matchings = match_verification_tasks(verification_tasks, user_data, db)
+            verification_assignments = [{'task_id': task_id, 'user_id': user_id} for task_id, user_id in verification_matchings]
+            insert_assignments(verification_assignments, db)
 
     # Close database connection
+    log_step(logger, "match_users_and_tasks exit")
     db.close()
 
 
 
 if __name__ == '__main__':
+    import task_parameters
     db_name = helper_functions.get_env("DB_NAME", "")
-    match_users_and_tasks(algorithm_weighted, db_name)
+    match_users_and_tasks(task_parameters.MATCHING_ALGO, db_name)

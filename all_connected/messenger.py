@@ -12,12 +12,21 @@ from datetime import datetime
 
 import os
 helper_functions.load_env()
+import json
+import time as _time
+from pathlib import Path
+
+from run_logging import get_logger, log_step
+
+logger = get_logger(__name__)
+logger.info("module loaded")
 
 ### ### CONSTANTS ### ###
 DB_NAME = helper_functions.get_env("DB_NAME", "")
 
 
 def add_users(user_store):
+    log_step(logger, "add_users enter", keys=len(user_store) if user_store else 0)
     '''
     Gets teh database connection. Returns nothing.
     Add users to the database based on the current list of users in the the workplace 
@@ -35,81 +44,104 @@ def add_users(user_store):
             cur.execute(query, (name, key))
             conn.commit()
     conn.close()
+    log_step(logger, "add_users exit")
 
 def get_total_users():
+    log_step(logger, "get_total_users enter")
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = "SELECT COUNT(id) FROM users WHERE `status` = 'active'"
     cur.execute(query)
     total_users = cur.fetchone()[0]
+    log_step(logger, "get_total_users exit", total_users=total_users)
     return int(total_users)
 
 def get_active_users_list():
+    log_step(logger, "get_active_users_list enter")
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = "SELECT id FROM users WHERE `status` = 'active'"
     cur.execute(query)
     active_users_list = cur.fetchall()
     active_users = [user[0] for user in active_users_list]
+    log_step(logger, "get_active_users_list exit", count=len(active_users))
     return active_users
 
 def get_all_users_list():
+    log_step(logger, "get_all_users_list enter")
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = "SELECT id FROM users"
     cur.execute(query)
     all_users_list = cur.fetchall()
     all_users = [user[0] for user in all_users_list]
+    log_step(logger, "get_all_users_list exit", count=len(all_users))
     return all_users
 
 def get_account_info(user_id):
+    log_step(logger, "get_account_info enter", user_id=user_id)
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = f"SELECT compensation FROM users WHERE id = '{user_id}'"
     cur.execute(query)
     compensation = cur.fetchone()[0]
-    query = f"SELECT task_id FROM assignments WHERE user_id = '{user_id}' AND checked = 1 AND submission_time IS NOT NULL"
+    if "checked" in columns:
+        query = f"SELECT task_id FROM assignments WHERE user_id = '{user_id}' AND checked = 1 AND submission_time IS NOT NULL"
+        query_mode = "checked"
+    else:
+        query = f"SELECT task_id FROM assignments WHERE user_id = '{user_id}' AND submission_time IS NOT NULL"
+        query_mode = "no_checked"
     cur.execute(query)
     tasks = [task[0] for task in cur.fetchall()]
+    log_step(logger, "get_account_info exit", task_count=len(tasks))
     return compensation, tasks
 
 def update_account_status(user_id, status):
+    log_step(logger, "update_account_status enter", user_id=user_id, status=status)
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     cur.execute(f"UPDATE users SET `status` = '{status}' WHERE id = '{user_id}'")
     conn.commit()
     conn.close
+    log_step(logger, "update_account_status exit")
 
 def add_account_compensation(user_id, compensation):
+    log_step(logger, "add_account_compensation enter", user_id=user_id, compensation=compensation)
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     cur.execute(f"UPDATE users SET `compensation` = compensation + {compensation} WHERE id = '{user_id}'")
     conn.commit()
     conn.close
+    log_step(logger, "add_account_compensation exit")
 
 def update_tasks_expired():
+    log_step(logger, "update_tasks_expired enter")
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     cur.execute("UPDATE tasks SET `expired` = 1 WHERE (start_time + INTERVAL time_window MINUTE) < NOW()")
     conn.commit()
     conn.close
+    log_step(logger, "update_tasks_expired exit")
 
 def get_task_list(user_id, task_id):
+    log_step(logger, "get_task_list enter", user_id=user_id, task_id=task_id)
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = f'''SELECT assignments.task_id, assignments.user_id, 
                 tasks.location, tasks.description, tasks.start_time, tasks.time_window, 
-                tasks.compensation
+                tasks.compensation, tasks.task_type, tasks.assignment_id
                 FROM assignments INNER JOIN tasks ON assignments.task_id = tasks.id
                 WHERE (assignments.task_id = {task_id} AND assignments.user_id = '{user_id}')'''
     cur.execute(query)
     assignment = cur.fetchone()
     conn.close()
     assert assignment, f"Assignment #{task_id} could not be found in database!"
+    log_step(logger, "get_task_list exit ok")
     return assignment
 
 
 def get_assignments(db_name):
+    log_step(logger, "get_assignments enter", db_name=db_name)
     '''
     Get all the assignments with status 'not assigned' together with each task's details. 
     Create a dictionary with keys being user ids and values being a list of tasks (with
@@ -121,7 +153,7 @@ def get_assignments(db_name):
     cur = conn.cursor()
     query = '''SELECT assignments.task_id, assignments.user_id, 
                 tasks.location, tasks.description, tasks.start_time, tasks.time_window, 
-                tasks.compensation
+                tasks.compensation, tasks.task_type, tasks.assignment_id
                 FROM assignments INNER JOIN tasks ON assignments.task_id = tasks.id
                 WHERE (assignments.`status` = 'not assigned' AND tasks.expired != 1)'''
     cur.execute(query)
@@ -133,10 +165,12 @@ def get_assignments(db_name):
         if uid in assignments_dict:
             (assignments_dict[uid]).append(assignment)
         else:
-            assignments_dict[uid] = [assignment]       
+            assignments_dict[uid] = [assignment]
+    log_step(logger, "get_assignments exit", users=len(assignments_dict), total_assignments=len(assignments))
     return assignments_dict
 
 def get_assign_status(task, user):
+    log_step(logger, "get_assign_status enter", task=task, user=user)
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = f'''SELECT status FROM assignments
@@ -144,10 +178,12 @@ def get_assign_status(task, user):
     '''
     cur.execute(query)
     status = cur.fetchone()[0]
+    log_step(logger, "get_assign_status exit", status=status)
     return status
 
 
 def update_assign_status(status, task_id, user_id):
+    log_step(logger, "update_assign_status enter", status=status, task_id=task_id, user_id=user_id)
     '''
     Takes database name, the new status of the assignment, the task id and 
         the user id. 
@@ -169,8 +205,10 @@ def update_assign_status(status, task_id, user_id):
         cur.execute(f"UPDATE assignments SET `status` = '{status}' WHERE task_id={task_id} AND user_id='{user_id}'")
     conn.commit()
     conn.close
+    log_step(logger, "update_assign_status exit", status=status)
 
 def get_accepted_tasks(user_id) -> list:
+    log_step(logger, "get_accepted_tasks enter", user_id=user_id)
     """
     Takes a user id (int)
     Finds that user's assignment data.
@@ -186,11 +224,12 @@ def get_accepted_tasks(user_id) -> list:
     cur.execute(query)
 
     task_list = [int(task_id[0]) for task_id in cur.fetchall()]
-    
     conn.close()
+    log_step(logger, "get_accepted_tasks exit", count=len(task_list))
     return task_list
 
 def get_pending_tasks(user_id) -> list:
+    log_step(logger, "get_pending_tasks enter", user_id=user_id)
     """
     Takes a user id (int)
     Finds that user's assignment data.
@@ -209,45 +248,121 @@ def get_pending_tasks(user_id) -> list:
     cur.execute(query)
     task_list = [item[0] for item in cur.fetchall()]
     conn.close()
+    log_step(logger, "get_pending_tasks exit", count=len(task_list))
     return task_list
 
 def check_time_window(task_id):
+    log_step(logger, "check_time_window enter", task_id=task_id)
     update_tasks_expired()
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
-    cur.execute(f"SELECT expired, (start_time<NOW()) FROM tasks WHERE id = {task_id}")
+    
+    try:
+        payload = {
+            "sessionId": "15a5f2",
+            "runId": "run1",
+            "hypothesisId": "H9",
+            "location": "messenger.py:check_time_window",
+            "message": "check_time_window query",
+            "data": {"task_id": task_id},
+            "timestamp": int(_time.time() * 1000),
+        }
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+    # endregion
+    cur.execute("SELECT expired, (start_time<NOW()) FROM tasks WHERE id = %s", (task_id,))
     timing = cur.fetchone()
+    if timing is None:
+        log_step(logger, "check_time_window exit no_task", task_id=task_id)
+        conn.close()
+        return "not started"
     expired = timing[0]
     started = timing[1]
+    conn.close()
     if expired == 1:
+        log_step(logger, "check_time_window exit", result="expired")
         return "expired"
     elif started == 0:
+        log_step(logger, "check_time_window exit", result="not started")
         return "not started"
+    log_step(logger, "check_time_window exit", result="open")
+    return "open"
 
 def submit_task(user_id, task_id, path):
+    log_step(logger, "submit_task enter", user_id=user_id, task_id=task_id, path_len=len(path) if path else 0)
     update_tasks_expired()
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     cur.execute(f"SELECT expired, (start_time<NOW()) FROM tasks WHERE id = {task_id}")
     timing = cur.fetchone()
+    if timing is None:
+        log_step(logger, "submit_task rejected no_task", task_id=task_id)
+        conn.close()
+        return {"ok": False}
     expired = timing[0]
     started = timing[1]
     if expired == 0 and started == 1:
-        query = f'''UPDATE assignments 
+        cur.execute(
+            "SELECT submission_time FROM assignments WHERE user_id = %s AND task_id = %s",
+            (user_id, task_id),
+        )
+        prior = cur.fetchone()
+        already_submitted = prior and prior[0] is not None
+
+        query = '''UPDATE assignments 
                     INNER JOIN users ON assignments.user_id = users.id
                     INNER JOIN tasks ON assignments.task_id = tasks.id
-                SET assignments.img = '{path}', 
+                SET assignments.img = %s, 
                     assignments.`submission_time` = NOW()
-                WHERE (assignments.user_id = '{user_id}' 
-                    AND assignments.task_id = {task_id})
+                WHERE (assignments.user_id = %s 
+                    AND assignments.task_id = %s)
                 '''
-        cur.execute(query)
+        cur.execute(query, (path, user_id, task_id))
         conn.commit()
+        comp_amount = 0.0
+        if not already_submitted:
+            cur.execute("SELECT compensation FROM tasks WHERE id = %s", (task_id,))
+            comp_row = cur.fetchone()
+            comp_amount = float(comp_row[0]) if comp_row and comp_row[0] is not None else 0.0
+        if comp_amount > 0 and not already_submitted:
+            cur.execute(
+                "UPDATE users SET compensation = compensation + %s WHERE id = %s",
+                (comp_amount, user_id),
+            )
+            conn.commit()
+            log_step(
+                logger,
+                "submit_task immediate compensation",
+                user_id=user_id,
+                task_id=task_id,
+                amount=comp_amount,
+            )
         conn.close()
+        trigger_verification(user_id, task_id, path)
         update_reliability(user_id)
-        return True
+        log_step(
+            logger,
+            "submit_task exit success",
+            compensation_paid=comp_amount,
+            already_submitted=already_submitted,
+        )
+        return {"ok": True, "compensation": comp_amount, "already_submitted": already_submitted}
     else:
-        return False
+        log_step(logger, "submit_task exit rejected", expired=expired, started=started)
+        return {"ok": False}
+
+
+def trigger_verification(user_id, task_id, path):
+    """Call this after successful submission."""
+    log_step(logger, "trigger_verification enter", user_id=user_id, task_id=task_id)
+    try:
+        from verification_integration import handle_submission_verification
+        handle_submission_verification(user_id, task_id, path)
+    except Exception as exc:
+        print(f"Verification failed for task {task_id}: {exc}")
+        log_step(logger, "trigger_verification failed", task_id=task_id, error=str(exc))
 
 def delete_submission(user_id, task_id):
     conn = helper_functions.connectDB(DB_NAME)
@@ -277,6 +392,7 @@ def check_all_assignments():
     return
 
 def update_reliability(user_id):
+    log_step(logger, "update_reliability enter", user_id=user_id)
     conn = helper_functions.connectDB(DB_NAME)
     cur = conn.cursor()
     query = f'''SELECT COUNT(status)
@@ -298,21 +414,26 @@ def update_reliability(user_id):
             new_reliability = 0.1
         else:
             new_reliability = round(submissions/accepted, 2)
-    query = f'''SELECT reliability
-                FROM users
-                WHERE user_id = '{user_id}'
-            '''
-    cur.execute(query)
-    old_reliability = cur.fetchone()[0]
-    reliability = old_reliability * 0.3 +new_reliability * 0.7
+    cur.execute(
+        "SELECT reliability FROM users WHERE id = %s",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        log_step(logger, "update_reliability skip no user", user_id=user_id)
+        conn.close()
+        return
+    old_reliability = float(row[0]) if row[0] is not None else 0.5
+    new_reliability = float(new_reliability)
+    reliability = old_reliability * 0.3 + new_reliability * 0.7
     print(user_id, reliability)
-    query = f'''UPDATE users 
-            SET reliability = {reliability}
-            WHERE id = '{user_id}'
-            '''
-    cur.execute(query)
+    cur.execute(
+        "UPDATE users SET reliability = %s WHERE id = %s",
+        (reliability, user_id),
+    )
     conn.commit()
     conn.close()
+    log_step(logger, "update_reliability exit", user_id=user_id, reliability=reliability)
     return
 
         

@@ -4,9 +4,17 @@ Date: 06/07/2023
 Description: File that connects all 5 components & calls functions for them to 
     run the backend of Snap N Go.
 """
+from run_logging import get_logger, log_step, get_root_logger, setup_error_logging
+
+logger = get_logger(__name__)
+logger.info("module loaded")
+get_root_logger()
+setup_error_logging()
+
 import os
 import helper_functions
 helper_functions.load_env()
+log_step(logger, "connections env loaded")
 
 import matching_assignments
 import task
@@ -21,19 +29,7 @@ from threading import Timer
 
 ### ### Control Center ### ###
 DB_NAME = helper_functions.get_env("DB_NAME", "")
-
-TASK_CYCLE = task_parameters.TASK_CYCLE #every half an hour
-NUM_TASKS_PER_CYCLE = task_parameters.NUM_TASKS_PER_CYCLE 
-
-MATCHING_CYCLE = task_parameters.MATCHING_CYCLE
-
-MESSENGER_BOT_CYCLE = task_parameters.MESSENGER_BOT_CYCLE 
-
-START_HOURS = task_parameters.START_HOURS
-END_HOURS = task_parameters.END_HOURS
-
-# Researchers who are not regular participants 
-admin_list = task_parameters.admin_list
+# All cycle/schedule knobs live in task_parameters — use task_parameters.* below
 
 
 
@@ -45,7 +41,7 @@ class RepeatTimer(Timer):
     def run(self):
         now = dt.now()
         not_weekend = now.strftime("%A").lower() not in {'saturday', 'sunday'}
-        during_workday = START_HOURS < now.time() < END_HOURS
+        during_workday = task_parameters.START_HOURS < now.time() < task_parameters.END_HOURS
         while not self.finished.wait(self.interval):
             if not_weekend and during_workday:
                 self.function(*self.args, **self.kwargs)
@@ -55,7 +51,8 @@ class RepeatTimer(Timer):
 # Generate & insert task(s)
 def task_call():
     """Takes & returns nothing. Container for task call timer."""
-    task.generate_tasks(NUM_TASKS_PER_CYCLE, DB_NAME)
+    log_step(logger, "task_call enter", num_tasks=task_parameters.NUM_TASKS_PER_CYCLE)
+    task.generate_tasks(task_parameters.NUM_TASKS_PER_CYCLE, DB_NAME)
     print('- tasks generated', dt.now())
 
 
@@ -63,6 +60,7 @@ def task_call():
 # Update expired tasks, matches unexpired & unassigned tasks to users, create those Assignments
 def match_call():
     """Takes & returns nothing. Container for match call timer."""
+    log_step(logger, "match_call enter")
     matching_assignments.match_users_and_tasks(task_parameters.MATCHING_ALGO, DB_NAME)
     print("- tasks matched", dt.now())
 
@@ -71,6 +69,7 @@ def match_call():
 # Sends out tasks & updates recommendTime in 'assignments' table
 def messenger_bot_call():
     """Takes & returns nothing. Container for messenger timer."""
+    log_step(logger, "messenger_bot_call enter")
     assign_dict = messenger.get_assignments(DB_NAME)
     bot.send_tasks(assign_dict)
     print('- sent tasks')
@@ -79,13 +78,14 @@ def messenger_bot_call():
 
 
 def start_all_timers():
-    task_timer = RepeatTimer(task_call, TASK_CYCLE)
+    log_step(logger, "start_all_timers enter")
+    task_timer = RepeatTimer(task_call, task_parameters.TASK_CYCLE)
     match_timer = RepeatTimer(match_call,
-                                seconds=MATCHING_CYCLE,
+                                seconds=task_parameters.MATCHING_CYCLE,
                                 minutes=0,
                                 hours=0)
     messenger_timer = RepeatTimer(messenger_bot_call,
-                                seconds=MESSENGER_BOT_CYCLE,
+                                seconds=task_parameters.MESSENGER_BOT_CYCLE,
                                 minutes=0,
                                 hours=0)
     # Start all cycles
@@ -102,13 +102,14 @@ def cancel_all_timers(task_timer, match_timer, messenger_timer):
     messenger_timer.cancel()
 
 def daily_cycle():
+    log_step(logger, "daily_cycle enter")
     all_users = messenger.get_all_users_list()
     for user_id in all_users:
-        if user_id not in admin_list:
+        if user_id not in task_parameters.admin_list:
             messenger.update_account_status(user_id, "active")
     task_timer, match_timer, messenger_timer = start_all_timers()
     # Run time
-    end_time = dt.combine(date.today(), END_HOURS)
+    end_time = dt.combine(date.today(), task_parameters.END_HOURS)
     duration = (end_time - dt.now()).total_seconds()
     print(duration)
     time.sleep(duration + 2) # run till end_time
@@ -121,13 +122,14 @@ def daily_cycle():
     cancel_all_timers(task_timer, match_timer, messenger_timer)
 
 def short_cycle():
+    log_step(logger, "short_cycle enter")
     all_users = messenger.get_all_users_list()
     for user_id in all_users:
-        if user_id not in admin_list:
+        if user_id not in task_parameters.admin_list:
             messenger.update_account_status(user_id, "active")
     task_timer, match_timer, messenger_timer = start_all_timers()
     # Run time
-    end_time = dt.combine(date.today(), END_HOURS)
+    end_time = dt.combine(date.today(), task_parameters.END_HOURS)
     duration = (end_time - dt.now()).total_seconds()
     print(duration)
     time.sleep(duration + 2) # run till end_time
@@ -137,7 +139,8 @@ def short_cycle():
     cancel_all_timers(task_timer, match_timer, messenger_timer)
 
 if __name__ == "__main__":
-    start_hours_str = START_HOURS.strftime("%H:%M")
+    log_step(logger, "connections main schedule loop starting")
+    start_hours_str = task_parameters.START_HOURS.strftime("%H:%M")
 
     schedule.every().monday.at(start_hours_str).do(short_cycle)
     schedule.every().tuesday.at(start_hours_str).do(short_cycle)

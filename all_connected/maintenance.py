@@ -9,13 +9,17 @@ import matching_assignments
 import task
 import messenger
 import bot
-import task_parameters
 
 import time
 
 
 import os
 helper_functions.load_env()
+from run_logging import get_logger, log_step, setup_error_logging
+
+logger = get_logger(__name__)
+setup_error_logging()
+logger.info("module loaded")
 
 import json
 import requests
@@ -33,9 +37,6 @@ from datetime import datetime, timedelta, time, date
 
 ### ### Control Center ### ###
 DB_NAME = helper_functions.get_env("DB_NAME", "")
-
-START_HOURS = task_parameters.START_HOURS
-END_HOURS = task_parameters.END_HOURS
 
 def add_new_users():
     user_store = bot.get_all_users_info()
@@ -63,6 +64,58 @@ def test_update_reliability(user_id):
     cur.execute(query)
     accepted = cur.fetchall()
     print(accepted)
+
+def print_gemini_submission_summary(limit=20):
+    """
+    Print recent assignments that have an image — shows Gemini decision if present.
+    Use when debugging verification without opening SQL.
+    """
+    conn = helper_functions.connectDB(DB_NAME)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, user_id, task_id, submission_time,
+                      gemini_decision, verified_at, verified_count,
+                      LEFT(gemini_explanation, 80) AS reason_preview
+               FROM assignments
+               WHERE submission_time IS NOT NULL
+               ORDER BY submission_time DESC
+               LIMIT %s""",
+            (limit,),
+        )
+        rows = cur.fetchall()
+        for r in rows:
+            print(r)
+        log_step(logger, "maintenance print_gemini_summary", rows=len(rows))
+    finally:
+        conn.close()
+
+
+def export_assignments_with_gemini(csv_file):
+    """Export assignments with submission + Gemini columns for analysis."""
+    conn = helper_functions.connectDB(DB_NAME)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, task_id, user_id, submission_time,
+                      gemini_decision, verified_at, verified_count, gemini_explanation
+               FROM assignments
+               WHERE submission_time IS NOT NULL"""
+        )
+        rows = cur.fetchall()
+        df = pd.DataFrame(
+            rows,
+            columns=[
+                "id", "task_id", "user_id", "submission_time",
+                "gemini_decision", "verified_at", "verified_count", "gemini_explanation",
+            ],
+        )
+        df.to_csv(csv_file, index=False)
+        print(f"Exported {len(df)} rows to {csv_file}")
+        log_step(logger, "maintenance export_assignments_with_gemini", path=csv_file, rows=len(df))
+    finally:
+        conn.close()
+
 
 def export_table_to_csv(table_name, csv_file):
     # Connect to MySQL database
@@ -95,4 +148,6 @@ if __name__ == "__main__":
     export_table_to_csv('users', '../users.csv')
     export_table_to_csv('assignments', '../assignments.csv')
     export_table_to_csv('tasks', '../tasks.csv')
+    export_table_to_csv('user_feedback', '../user_feedback.csv')
+    print_gemini_submission_summary()
     print("DONE")

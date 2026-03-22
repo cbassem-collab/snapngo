@@ -1,5 +1,8 @@
 flask
+cryptography
+google-genai
 pandas
+Pillow
 PyMySQL
 python-dotenv
 requests

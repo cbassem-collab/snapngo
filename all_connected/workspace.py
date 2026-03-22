@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 import os
 import helper_functions
 helper_functions.load_env()
+from run_logging import get_logger, log_step
+
+logger = get_logger(__name__)
+logger.info("module loaded")
 
 from messenger import update_tasks_expired, get_task_list
 from helper_functions import connectDB

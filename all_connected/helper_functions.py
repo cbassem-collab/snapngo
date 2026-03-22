@@ -3,32 +3,42 @@ Name: Sofia Kobayashi
 Date: 06/07/2023
 Description: General helper functions & environment set up for the overall Snap N Go connections.
 """
+from run_logging import get_logger, log_step
+
+logger = get_logger(__name__)
+logger.info("module loaded")
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 
 def load_env():
+    log_step(logger, "load_env enter")
     repo_root = Path(__file__).resolve().parent.parent
     env_path = repo_root / '.env'
     load_dotenv(dotenv_path=env_path)
+    log_step(logger, "load_env exit", env_path=str(env_path))
     return env_path
 
 
 def get_env(name, default=None):
+    log_step(logger, "get_env", name=name, has_default=default is not None)
     if name not in os.environ:
         load_env()
     return os.environ.get(name, default)
 
+import json
+import sys
+import time as _time
 import pymysql
 from flask import Flask
 
 
 from datetime import datetime, time
 
-
-
 def connectDB(dbName):
+    log_step(logger, "connectDB enter", dbName_set=bool(dbName))
     """
      * General Helper Function * 
     Takes a database name (str).
@@ -47,12 +57,13 @@ def connectDB(dbName):
         password=sql_pass, 
         db=dbName
     )
-
+    log_step(logger, "connectDB exit ok")
     return db
 
 
 # code to open text file and read into a matrix
 def read_file(fname):
+    log_step(logger, "read_file enter", fname=fname)
     with open(fname, "r") as file:
         # Read the first line that contains the number of vertices
         numVertices = int(file.readline().strip())
@@ -77,6 +88,7 @@ def read_file(fname):
             matrix[v2-1][v1-1] = distance
 
         # Return the matrix and the dictionary of vertices
+        log_step(logger, "read_file exit", numVertices=numVertices)
         return matrix, vertices
 
 

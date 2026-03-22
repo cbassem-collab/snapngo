@@ -42,7 +42,7 @@
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": "\n.  *4.* Send the message!\n    *5.* We'll check the the submissions at the end of the day and send you a daily summary. \n            •  Your compensation will be added after your submission is checked. You can type and send `account` to see your account status at any time."
+				"text": "\n.  *4.* Send the message!\n    *5.* Your compensation for that task is added to your account as soon as we receive your image. Reply `account` anytime to see your balance and completed tasks. You may also get verification tasks to review others' submissions."
 			}
 		},
 		{

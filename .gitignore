@@ -2,3 +2,6 @@
 __pycache__/
 venv
 .env
+logs/
+.vscode/
+snapngo_pics/
