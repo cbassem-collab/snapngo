@@ -4,14 +4,14 @@
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": "Welcome to Snap N Go :wave:"
+				"text": "Welcome to Snap'N'Go :wave:"
 			}
 		},
 		{
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": "Great to see you here! Snap N Go is a system that will assign you small tasks throughout the day that you can get paid for successfully completing! \n\n *Each Task* will have:\n      •  *Start Time:* when the task starts\n      •  *Window:* how long the task will be open for\n      •  *Description:* what this task entails\n      •  *Compensation ✨:* the money you'll get for successfully completing this task!\n\n This bot will periodically send you tasks through your DMs for you to either accept or reject."
+				"text": "Great to see you here! Snap'N'Go assigns you small tasks throughout the day that you can get paid for completing.\n\n*Two types of tasks:*\n• *Data collection* — Take a photo that matches the task. Accept first, then submit.\n• *Verification* — Review someone else's photo: see our AI's decision and click Agree or Disagree. Compensation is added *immediately* when you complete either type.\n\n*Each task shows:*\n• *Start Time* — when the task opens\n• *Window* — how long it's open\n• *Description* — what to do\n• *Compensation* — points you earn\n\nTaskBot will send you tasks through DMs. Reply `help` or `?` anytime for full instructions!"
 			}
 		},
 		{
@@ -21,7 +21,7 @@
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": "*Submitting to a Task:*\n    *1.* Complete the task's objective \n    *2.* Go to the @TaskBot DM channel here on Slack \n    *3.* Type the task number & attach that task's image (see below)\n"
+				"text": "*Submitting a photo (data collection tasks):*\n    *1.* Complete the task\n    *2.* Go to the TaskBot DM channel\n    *3.* Type the task number and attach the image (see below)\n    *4.* Send! Compensation is added right away."
 			}
 		},
 		{
@@ -35,20 +35,13 @@
 			"alt_text": "image1"
 		},
 		{
-			"type": "section",
-			"text": {
-				"type": "mrkdwn",
-				"text": "\n.  *4.* Send the message!\n    *5.* We'll check the task & send back a confirmation! \n            •  This step may take a few minutes"
-			}
-		},
-		{
 			"type": "divider"
 		},
 		{
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": "Type and send `?` or `help` to see this information again or for  information about *receiving tasks*, *accepting/rejecting tasks*, other *questions*, or *reporting a bug/recommendation*.\n\n Thank you again for being part of Snap N Go! We'll send you your first tasks soon!"
+				"text": "Type `?` or `help` for more info. Reply `account` to see your balance. We'll send you your first tasks soon!"
 			}
 		}
 	]

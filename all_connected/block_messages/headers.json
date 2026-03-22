@@ -4,14 +4,14 @@
 		"type": "section",
 		"text": {
 			"type": "mrkdwn",
-			"text": " *✅ Your Active Tasks ✅* \nAccepted, uncompleted tasks that haven't expired yet."
+			"text": " *✅ Your Active Tasks ✅* \nAccepted data collection or verification tasks that haven't expired yet."
 		}
 	},
 	"no_active_header":{
 		"type": "section",
 		"text": {
 			"type": "mrkdwn",
-			"text": " *✅ You have no active tasks! ✅* \n Active tasks are accepted, uncompleted, and unexpired tasks. Accept pending task to get more!"
+			"text": " *✅ You have no active tasks! ✅* \nActive tasks are accepted data collection or verification tasks. Accept a pending task to get more!"
 		}
 	},
 	"too_many_active_header": {
@@ -26,7 +26,7 @@
 		"type": "section",
 		"text": {
 			"type": "mrkdwn",
-			"text": " *⌛ Your Pending Tasks ⌛* \nTasks you haven't accepted or rejected yet."
+			"text": " *⌛ Your Pending Tasks ⌛* \nData collection or verification tasks you haven't accepted or rejected yet."
 		}
 	},
 	"no_pending_header":{

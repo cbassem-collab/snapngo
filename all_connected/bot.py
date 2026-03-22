@@ -105,7 +105,7 @@ def send_welcome_message(users_list) -> None:
             try:
                 print(f'IN Welcome: {user_id}', datetime.now())
                 channel_id = _get_dm_channel_id(user_id)
-                client.chat_postMessage(channel=channel_id, blocks = onboarding['blocks'], text="Welcome to Snap N Go!")
+                client.chat_postMessage(channel=channel_id, blocks = onboarding['blocks'], text="Welcome to Snap'N'Go!")
                 print("Welcome!")
             except SlackApiError as e:
                 assert e.response["ok"] is False and e.response["error"], f"Got an error: {e.response['error']}"
