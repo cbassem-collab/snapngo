@@ -340,7 +340,6 @@ def submit_task(user_id, task_id, path):
                 amount=comp_amount,
             )
         conn.close()
-        trigger_verification(user_id, task_id, path)
         update_reliability(user_id)
         log_step(
             logger,
@@ -353,16 +352,6 @@ def submit_task(user_id, task_id, path):
         log_step(logger, "submit_task exit rejected", expired=expired, started=started)
         return {"ok": False}
 
-
-def trigger_verification(user_id, task_id, path):
-    """Call this after successful submission."""
-    log_step(logger, "trigger_verification enter", user_id=user_id, task_id=task_id)
-    try:
-        from verification_integration import handle_submission_verification
-        handle_submission_verification(user_id, task_id, path)
-    except Exception as exc:
-        print(f"Verification failed for task {task_id}: {exc}")
-        log_step(logger, "trigger_verification failed", task_id=task_id, error=str(exc))
 
 def delete_submission(user_id, task_id):
     conn = helper_functions.connectDB(DB_NAME)

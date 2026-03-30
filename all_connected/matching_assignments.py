@@ -121,22 +121,74 @@ def get_verification_task_submitters(db, task_ids):
     return m
 
 
+def get_submission_assignment_id_for_verification_task(db, verification_task_id):
+    """The assignments.id of the submission being verified (tasks.assignment_id)."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT assignment_id FROM tasks WHERE id = %s AND task_type = 'verification'",
+        (verification_task_id,),
+    )
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
+def get_users_already_assigned_verification_for_submission(db, submission_assignment_id):
+    """
+    Slack user IDs already assigned to any verification task for this submission
+    (so they must not receive another verification for the same submission).
+    """
+    if submission_assignment_id is None:
+        return set()
+    cursor = db.cursor()
+    cursor.execute(
+        """SELECT DISTINCT a.user_id
+           FROM assignments a
+           INNER JOIN tasks t ON a.task_id = t.id
+           WHERE t.task_type = 'verification'
+             AND t.assignment_id = %s""",
+        (submission_assignment_id,),
+    )
+    return {row[0] for row in cursor.fetchall()}
+
+
 def match_verification_tasks(task_ids, user_data, db):
     log_step(logger, "match_verification_tasks enter", task_count=len(task_ids) if task_ids else 0)
     import task_parameters
     allow_self = getattr(task_parameters, "ALLOW_SELF_VERIFICATION_FOR_TESTING", False)
     submitter_map = get_verification_task_submitters(db, task_ids)
     matchings = []
-    for task_id in task_ids:
+    # Avoid assigning two new verification tasks for the same submission to the same user in one batch
+    # (assignments not in DB yet for earlier tasks in this loop).
+    assigned_this_batch = {}
+
+    task_id_list = list(task_ids)
+    random.shuffle(task_id_list)
+
+    for task_id in task_id_list:
         submitter = submitter_map.get(task_id)
+        submission_aid = get_submission_assignment_id_for_verification_task(db, task_id)
+        already_db = get_users_already_assigned_verification_for_submission(db, submission_aid)
+        already_batch = assigned_this_batch.get(submission_aid, set())
+        already = already_db | already_batch
+
         if allow_self:
-            available = user_data["id"]
+            pool = [uid for uid in user_data["id"] if uid not in already]
         else:
-            available = [uid for uid in user_data["id"] if uid != submitter]
-        if not available:
-            available = user_data["id"]
-        user_id = random.choice(list(available))
+            pool = [uid for uid in user_data["id"] if uid != submitter and uid not in already]
+
+        if not pool:
+            log_step(
+                logger,
+                "match_verification_tasks skip no eligible verifier",
+                task_id=task_id,
+                submission_assignment_id=submission_aid,
+            )
+            continue
+
+        user_id = random.choice(pool)
         matchings.append([task_id, user_id])
+        assigned_this_batch.setdefault(submission_aid, set()).add(user_id)
+
     log_step(logger, "match_verification_tasks exit", matchings=len(matchings))
     return matchings
 

@@ -4,6 +4,7 @@ Date: 06/07/2023
 Description: General helper functions & environment set up for the overall Snap N Go connections.
 """
 from run_logging import get_logger, log_step
+from task_parameters import START_HOURS, END_HOURS
 
 logger = get_logger(__name__)
 logger.info("module loaded")
@@ -91,7 +92,12 @@ def read_file(fname):
         log_step(logger, "read_file exit", numVertices=numVertices)
         return matrix, vertices
 
-
+def is_weekday_and_business_hours() -> bool:
+    now = datetime.now()
+    if now.strftime("%A").lower() in {"saturday", "sunday"}:
+        return False
+    t = now.time()
+    return START_HOURS <= t <= END_HOURS
 
 if __name__ == '__main__':
     pass

@@ -1,4 +1,7 @@
+from typing import Optional
+
 import helper_functions
+import task_parameters
 from gemini_verifier import verify_submission, is_verified
 from run_logging import get_logger, log_step
 
@@ -54,3 +57,54 @@ def handle_submission_verification(user_id: str, task_id: int, image_path: str) 
         )
     finally:
         conn.close()
+
+
+def process_pending_gemini_verifications(limit: Optional[int] = None) -> int:
+    """
+    Connector-driven entry point: find data-collection submissions with an image but no
+    Gemini result yet, and run verification for each (same logic as handle_submission_verification).
+
+    Messenger only writes img to the DB; connections calls this on a timer.
+    Returns how many assignments were processed successfully.
+    """
+    if limit is None:
+        limit = task_parameters.GEMINI_VERIFICATION_BATCH
+
+    log_step(logger, "process_pending_gemini_verifications enter", limit=limit)
+    db_name = helper_functions.get_env("DB_NAME", "")
+    if not db_name:
+        return 0
+
+    conn = helper_functions.connectDB(db_name)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT a.user_id, a.task_id, a.img
+               FROM assignments a
+               INNER JOIN tasks t ON a.task_id = t.id
+               WHERE a.img IS NOT NULL
+                 AND a.verified_at IS NULL
+                 AND t.task_type = 'data_collection'
+               ORDER BY a.submission_time ASC
+               LIMIT %s""",
+            (limit,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    done = 0
+    for user_id, task_id, img in rows:
+        try:
+            handle_submission_verification(user_id, task_id, img)
+            done += 1
+        except Exception as exc:
+            log_step(
+                logger,
+                "process_pending_gemini_verifications row failed",
+                user_id=user_id,
+                task_id=task_id,
+                error=str(exc),
+            )
+    log_step(logger, "process_pending_gemini_verifications exit", processed=done)
+    return done

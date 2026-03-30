@@ -50,7 +50,7 @@ def random_datetime(n):
     elif now.time() < task_parameters.START_HOURS:
         start = datetime.combine(now.date(), task_parameters.START_HOURS)
     # If weekday, during hours -> start time = now
-    elif task_parameters.START_HOURS < now.time() < task_parameters.END_HOURS:
+    elif task_parameters.START_HOURS <= now.time() <= task_parameters.END_HOURS:
         start = now
     # If weekday (except friday), after hours -> start time = next day at start_hours
     else:
@@ -76,9 +76,9 @@ def create_task(locations, all_descriptions):
         to FALSE, all other features to be determined & added later.
     Returns a task object.
     """
-    # Generate a random location, time window (seconds), and compensation (cents)
+    # Random location, time window, and compensation (dollars; mixture in task_parameters)
     location = random.choice(locations)
-    compensation = round(random.uniform(task_parameters.TASK_COMP[0], task_parameters.TASK_COMP[1]), 2)
+    compensation = task_parameters.sample_data_collection_compensation()
     window = random.randint(task_parameters.TASK_TIMEWINDOW[0], task_parameters.TASK_TIMEWINDOW[1])  # in minutes
     
     print(window)
@@ -133,6 +133,10 @@ def generate_tasks(num_tasks, db_name):
     Creates those tasks & inserts them into the Tasks database.
     Returns nothing.
     """
+    if not helper_functions.is_weekday_and_business_hours():
+        log_step(logger, "generate_tasks skip outside Mon–Fri business hours")
+        return
+
     # Open database connection
     db = helper_functions.connectDB(db_name)
     # Get list of possible locations

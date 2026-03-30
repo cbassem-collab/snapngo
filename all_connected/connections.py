@@ -21,6 +21,7 @@ import task
 import messenger
 import bot
 import task_parameters
+import verification_integration
 
 from datetime import datetime as dt, date
 import time
@@ -36,14 +37,10 @@ DB_NAME = helper_functions.get_env("DB_NAME", "")
 class RepeatTimer(Timer):
     def __init__(self, func, seconds=10, minutes=0, hours=0):
         super().__init__(seconds + minutes*60 + hours*3600, func)
-        func()
 
     def run(self):
-        now = dt.now()
-        not_weekend = now.strftime("%A").lower() not in {'saturday', 'sunday'}
-        during_workday = task_parameters.START_HOURS < now.time() < task_parameters.END_HOURS
         while not self.finished.wait(self.interval):
-            if not_weekend and during_workday:
+            if helper_functions.is_weekday_and_business_hours():
                 self.function(*self.args, **self.kwargs)
 
 
@@ -76,30 +73,52 @@ def messenger_bot_call():
     messenger.update_assign_status("pending", 0, 0)
 
 
+### ### Gemini verification ### ###
+def gemini_verification_call():
+    """Process submissions that have images but no Gemini result yet."""
+    log_step(logger, "gemini_verification_call enter")
+    n = verification_integration.process_pending_gemini_verifications()
+    if n:
+        print("- gemini verification processed", n, dt.now())
+
 
 def start_all_timers():
     log_step(logger, "start_all_timers enter")
     task_timer = RepeatTimer(task_call, task_parameters.TASK_CYCLE)
-    match_timer = RepeatTimer(match_call,
-                                seconds=task_parameters.MATCHING_CYCLE,
-                                minutes=0,
-                                hours=0)
-    messenger_timer = RepeatTimer(messenger_bot_call,
-                                seconds=task_parameters.MESSENGER_BOT_CYCLE,
-                                minutes=0,
-                                hours=0)
-    # Start all cycles
+    match_timer = RepeatTimer(
+        match_call,
+        seconds=task_parameters.MATCHING_CYCLE,
+        minutes=0,
+        hours=0,
+    )
+    messenger_timer = RepeatTimer(
+        messenger_bot_call,
+        seconds=task_parameters.MESSENGER_BOT_CYCLE,
+        minutes=0,
+        hours=0,
+    )
+    gemini_timer = RepeatTimer(
+        gemini_verification_call,
+        seconds=task_parameters.GEMINI_VERIFICATION_CYCLE,
+        minutes=0,
+        hours=0,
+    )
     task_timer.start()
     match_timer.start()
     messenger_timer.start()
+    gemini_timer.start()
     print("STARTED ALL TIMERS", dt.now())
-    return task_timer, match_timer, messenger_timer
+    if helper_functions.is_weekday_and_business_hours():
+        verification_integration.process_pending_gemini_verifications()
+    return task_timer, match_timer, messenger_timer, gemini_timer
 
-def cancel_all_timers(task_timer, match_timer, messenger_timer):
+
+def cancel_all_timers(task_timer, match_timer, messenger_timer, gemini_timer):
     print("CANCEL ALL TIMERS", dt.now())
     task_timer.cancel()
     match_timer.cancel()
     messenger_timer.cancel()
+    gemini_timer.cancel()
 
 def daily_cycle():
     log_step(logger, "daily_cycle enter")
@@ -107,7 +126,7 @@ def daily_cycle():
     for user_id in all_users:
         if user_id not in task_parameters.admin_list:
             messenger.update_account_status(user_id, "active")
-    task_timer, match_timer, messenger_timer = start_all_timers()
+    task_timer, match_timer, messenger_timer, gemini_timer = start_all_timers()
     # Run time
     end_time = dt.combine(date.today(), task_parameters.END_HOURS)
     duration = (end_time - dt.now()).total_seconds()
@@ -119,7 +138,7 @@ def daily_cycle():
         if user_id not in ['USLACKBOT']:
             messenger.update_reliability(user_id)
     # End all cycles
-    cancel_all_timers(task_timer, match_timer, messenger_timer)
+    cancel_all_timers(task_timer, match_timer, messenger_timer, gemini_timer)
 
 def short_cycle():
     log_step(logger, "short_cycle enter")
@@ -127,7 +146,7 @@ def short_cycle():
     for user_id in all_users:
         if user_id not in task_parameters.admin_list:
             messenger.update_account_status(user_id, "active")
-    task_timer, match_timer, messenger_timer = start_all_timers()
+    task_timer, match_timer, messenger_timer, gemini_timer = start_all_timers()
     # Run time
     end_time = dt.combine(date.today(), task_parameters.END_HOURS)
     duration = (end_time - dt.now()).total_seconds()
@@ -136,7 +155,7 @@ def short_cycle():
     # Check assignments and end daily summary
     bot.check_all_assignments()
     # End all cycles
-    cancel_all_timers(task_timer, match_timer, messenger_timer)
+    cancel_all_timers(task_timer, match_timer, messenger_timer, gemini_timer)
 
 if __name__ == "__main__":
     log_step(logger, "connections main schedule loop starting")
@@ -147,8 +166,6 @@ if __name__ == "__main__":
     schedule.every().wednesday.at(start_hours_str).do(short_cycle)
     schedule.every().thursday.at(start_hours_str).do(short_cycle)
     schedule.every().friday.at(start_hours_str).do(short_cycle)
-    schedule.every().saturday.at(start_hours_str).do(short_cycle)
-    schedule.every().sunday.at(start_hours_str).do(short_cycle)
     
     while True:
         schedule.run_pending()
