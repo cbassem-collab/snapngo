@@ -44,13 +44,27 @@ class RepeatTimer(Timer):
                 self.function(*self.args, **self.kwargs)
 
 
+def deliver_pending_task_notifications():
+    """DM all users who have new not-assigned tasks; then mark those assignments pending."""
+    log_step(logger, "deliver_pending_task_notifications enter")
+    assign_dict = messenger.get_assignments(DB_NAME)
+    if not assign_dict:
+        log_step(logger, "deliver_pending_task_notifications exit nothing to send")
+        return
+    bot.send_tasks(assign_dict)
+    messenger.update_assign_status("pending", 0, 0)
+    print("- delivered task notifications", dt.now())
+
+
 ### ### Task Generation call ### ###
 # Generate & insert task(s)
 def task_call():
     """Takes & returns nothing. Container for task call timer."""
     log_step(logger, "task_call enter", num_tasks=task_parameters.NUM_TASKS_PER_CYCLE)
     task.generate_tasks(task_parameters.NUM_TASKS_PER_CYCLE, DB_NAME)
-    print('- tasks generated', dt.now())
+    matching_assignments.match_users_and_tasks(task_parameters.MATCHING_ALGO, DB_NAME)
+    deliver_pending_task_notifications()
+    print('- tasks generated, matched, and delivered', dt.now())
 
 
 ### ### Matching Algorithm & Assignments call ### ###
@@ -59,18 +73,17 @@ def match_call():
     """Takes & returns nothing. Container for match call timer."""
     log_step(logger, "match_call enter")
     matching_assignments.match_users_and_tasks(task_parameters.MATCHING_ALGO, DB_NAME)
-    print("- tasks matched", dt.now())
+    deliver_pending_task_notifications()
+    print("- tasks matched and delivered", dt.now())
 
 
 ### ### MESSENGER call ### ###
-# Sends out tasks & updates recommendTime in 'assignments' table
+# Backup pass: deliver anything still not sent (edge cases between timers)
 def messenger_bot_call():
     """Takes & returns nothing. Container for messenger timer."""
     log_step(logger, "messenger_bot_call enter")
-    assign_dict = messenger.get_assignments(DB_NAME)
-    bot.send_tasks(assign_dict)
-    print('- sent tasks')
-    messenger.update_assign_status("pending", 0, 0)
+    deliver_pending_task_notifications()
+    print('- messenger send pass', dt.now())
 
 
 ### ### Gemini verification ### ###

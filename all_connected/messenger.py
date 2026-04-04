@@ -84,15 +84,21 @@ def get_account_info(user_id):
     cur = conn.cursor()
     query = f"SELECT compensation FROM users WHERE id = '{user_id}'"
     cur.execute(query)
-    compensation = cur.fetchone()[0]
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        log_step(logger, "get_account_info exit no user", user_id=user_id)
+        return 0.0, []
+    compensation = row[0]
+    cur.execute("SHOW COLUMNS FROM assignments")
+    columns = [r[0] for r in cur.fetchall()]
     if "checked" in columns:
         query = f"SELECT task_id FROM assignments WHERE user_id = '{user_id}' AND checked = 1 AND submission_time IS NOT NULL"
-        query_mode = "checked"
     else:
         query = f"SELECT task_id FROM assignments WHERE user_id = '{user_id}' AND submission_time IS NOT NULL"
-        query_mode = "no_checked"
     cur.execute(query)
     tasks = [task[0] for task in cur.fetchall()]
+    conn.close()
     log_step(logger, "get_account_info exit", task_count=len(tasks))
     return compensation, tasks
 
@@ -180,6 +186,21 @@ def get_assign_status(task, user):
     status = cur.fetchone()[0]
     log_step(logger, "get_assign_status exit", status=status)
     return status
+
+
+def mark_assignment_pending_for_user(task_id, user_id):
+    """Set one assignment to pending after a targeted DM (e.g. on-demand `task` command)."""
+    log_step(logger, "mark_assignment_pending_for_user enter", task_id=task_id, user_id=user_id)
+    conn = helper_functions.connectDB(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        """UPDATE assignments SET `status` = 'pending', recommend_time = NOW()
+           WHERE task_id = %s AND user_id = %s""",
+        (task_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+    log_step(logger, "mark_assignment_pending_for_user exit")
 
 
 def update_assign_status(status, task_id, user_id):

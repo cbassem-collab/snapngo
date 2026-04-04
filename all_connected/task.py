@@ -10,6 +10,7 @@ import helper_functions
 import task_parameters
 import verification_task_manager
 from datetime import datetime, timedelta, time, date
+from typing import Optional
 import pandas as pd 
 
 import json
@@ -184,6 +185,45 @@ def generate_verification_tasks(num_tasks, db):
     verification_task_manager.create_verification_tasks(assignment_ids)
     log_step(logger, "generate_verification_tasks exit", created=len(assignment_ids))
     return len(assignment_ids)
+
+
+def generate_on_demand_task_for_user(user_id, db_name):
+    """
+    Create one data-collection task and assign it directly to the given user.
+    Does not use the normal cycle or business-hours gate; start time is soon (next-minutes window).
+    Returns the new task id, or None on failure.
+    """
+    log_step(logger, "generate_on_demand_task_for_user enter", user_id=user_id)
+    with open(task_parameters.TASK_LOCATION_FILE, "r", encoding="utf-8") as infile:
+        locations_list = json.load(infile)
+    with open(task_parameters.TASK_DESCRIPTION_FILE, "r", encoding="utf-8") as infile:
+        all_descriptions = json.load(infile)
+
+    t = create_task(locations_list, all_descriptions)
+    now = datetime.now()
+    end = now + timedelta(minutes=task_parameters.NEXT_MINUTES_START_WINDOW)
+    dates = pd.date_range(now, end, freq="1min").to_series()
+    start_times = [str(dates.sample(1, replace=True).iloc[0])]
+
+    db = helper_functions.connectDB(db_name)
+    try:
+        insert_tasks(db, [t], start_times)
+        cur = db.cursor()
+        cur.execute("SELECT LAST_INSERT_ID()")
+        row = cur.fetchone()
+        task_id = int(row[0]) if row and row[0] is not None else None
+        if not task_id:
+            log_step(logger, "generate_on_demand_task_for_user exit no_task_id")
+            return None
+        cur.execute(
+            "INSERT INTO assignments (`task_id`, `user_id`, `status`) VALUES (%s, %s, 'not assigned')",
+            (task_id, user_id),
+        )
+        db.commit()
+        log_step(logger, "generate_on_demand_task_for_user exit ok", task_id=task_id)
+        return task_id
+    finally:
+        db.close()
 
 
 if __name__ == '__main__':

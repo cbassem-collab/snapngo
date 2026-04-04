@@ -10,6 +10,7 @@ setup_error_logging()  # warnings + uncaught exceptions → logs/errors.log
 
 import messenger
 import feedback_collector
+import task
 
 import json
 import time as _time
@@ -21,7 +22,6 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt.adapter.flask import SlackRequestHandler
 from datetime import date, datetime
-import random
 
 
 ### ### CONSTANTS ### ###
@@ -382,14 +382,40 @@ def handle_message(payload, say):
     # Handle certain responses
     if BOT_ID != user_id:
         if 'files' not in payload:
-            if text.strip() == "?" or text.strip().lower() == 'help':
+            msg = (text or "").strip()
+            if msg == "?" or msg.lower() == "help":
                 log_step(logger, "interaction help", user_id=user_id)
                 say(info_page)
             # User only sends text without attaching an image
-            elif text.strip().lower() == "account":
+            elif msg.lower() == "task":
+                log_step(logger, "interaction on_demand task", user_id=user_id)
+                active_users = messenger.get_active_users_list()
+                if user_id not in active_users:
+                    say(
+                        "You need to be an active participant to get tasks. "
+                        "Reply `opt in` if you have opted out."
+                    )
+                else:
+                    tid = task.generate_on_demand_task_for_user(user_id, DB_NAME or "")
+                    if tid is None:
+                        say("Could not create a task right now. Please try again later.")
+                    else:
+                        try:
+                            task_info = messenger.get_task_list(user_id, tid)
+                            send_tasks({user_id: [task_info]})
+                            messenger.mark_assignment_pending_for_user(tid, user_id)
+                            say("Here is a new task for you. Accept or reject it above.")
+                        except Exception as exc:
+                            log_step(logger, "interaction on_demand task failed", error=str(exc))
+                            say("Something went wrong sending your task. Please try again.")
+            elif msg.lower() == "account":
                 log_step(logger, "interaction account", user_id=user_id)
-                send_messages(user_id, generate_account_summary_block(user_id), "")
-            elif text.strip().lower() == "report":
+                send_messages(
+                    user_id,
+                    generate_account_summary_block(user_id),
+                    "Your account summary",
+                )
+            elif msg.lower() == "report":
                 active_block = make_report_block(user_id)
                 end_block = [block_headers['divider'], block_headers['ending_block']]
                 dm_channel_id = _get_dm_channel_id(user_id)
@@ -408,10 +434,10 @@ def handle_message(payload, say):
                     client.chat_postMessage(channel=dm_channel_id, blocks = blocks, text="")
 
                 client.chat_postMessage(channel=dm_channel_id, blocks = end_block,text="")
-            elif text.strip().lower() == "opt in":
+            elif msg.lower() == "opt in":
                 messenger.update_account_status(user_id, "active")
                 say("You have opted in for the day.")
-            elif text.strip().lower() == "opt out":
+            elif msg.lower() == "opt out":
                 messenger.update_account_status(user_id, "inactive")
                 say("You have opted out for the day.")
             else:
@@ -609,9 +635,10 @@ def action_button_click(body, ack, say):
         # task_list = messenger.get
         message = generate_message(task_list, user)
         client.chat_update(channel=body["channel"]["id"], ts = body["message"]["ts"], blocks = message,text="Rejected!")
-        compensation = round(random.randint(10, 30)/100, 2)
-        messenger.add_account_compensation(user, compensation)
-        say(f"You {new_status} task {task}.\nA compensation of {compensation} points is added to your account. Reply `account` to see your account status.")
+        say(
+            f"You {new_status} task {task}. No compensation for rejecting. "
+            f"Reply `account` to see your balance."
+        )
     else:
         say(f"You already {old_status} task {task}")
     return
